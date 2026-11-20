@@ -1,0 +1,8 @@
+.DS_Store
+__pycache__/
+# Large data, not in the repository (see README: "Data not included")
+inputs/heatwave_tracks.csv.gz
+2026-10-08/LWA_JJA_5-10km_hist_regions_cache.npz
+# Intermediate figures written by steps 1-2 (copied into the site by step 3)
+2026-10-07/*.png
+2026-10-08/*.png

@@ -1,0 +1,254 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Heatwave Box Atlas</title>
+<meta name="description" content="Blocking-driven heatwaves in 18 Northern Hemisphere regions, MPI-ESM1.2-LR, historical + SSP3-7.0.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;700;800&family=Source+Sans+3:wght@400;600&family=IBM+Plex+Mono:wght@500&display=swap">
+<style>
+/* Layout: an atlas sheet. Full-width clickable map on top, box index below it, then the selected box's
+   statistics beside its figure. */
+:root {
+  --bg: #f3f5f7;
+  --panel: #ffffff;
+  --ink: #17212b;
+  --muted: #5b6875;
+  --rule: #d9dfe5;
+  --ocean: #e6eef5;
+  --land: #d5dbe0;
+  --coast: #8b98a5;
+  --accent: #0f5e8c;
+  --sel: #111a22;
+  --s-w: #fbd38d; --s-e: #e3901b;
+  --c-w: #a8dcb4; --c-e: #2f9a52;
+  --n-w: #b3cdec; --n-e: #2f68ad;
+  --el: #2563eb; --tr: #16a34a; --ml: #dc2626; --ah: #9ca3af;
+  --f-display: "Archivo", "Helvetica Neue", Arial, sans-serif;
+  --f-body: "Source Sans 3", "Segoe UI", Arial, sans-serif;
+  --f-mono: "IBM Plex Mono", ui-monospace, Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #11171d; --panel: #18212a; --ink: #e6ebf0; --muted: #9aa7b4; --rule: #2a3542;
+    --ocean: #142231; --land: #2c3742; --coast: #5c6b7a; --accent: #6db3e0; --sel: #f4f7fa;
+    --s-w: #8a6420; --s-e: #d98d1f; --c-w: #2f6b42; --c-e: #48b46c; --n-w: #2f4f78; --n-e: #5a93d6;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #11171d; --panel: #18212a; --ink: #e6ebf0; --muted: #9aa7b4; --rule: #2a3542;
+  --ocean: #142231; --land: #2c3742; --coast: #5c6b7a; --accent: #6db3e0; --sel: #f4f7fa;
+  --s-w: #8a6420; --s-e: #d98d1f; --c-w: #2f6b42; --c-e: #48b46c; --n-w: #2f4f78; --n-e: #5a93d6;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body { background: var(--bg); color: var(--ink); font-family: var(--f-body); font-size: 15px; line-height: 1.5; }
+.wrap { max-width: 1280px; margin: 0 auto; padding-inline: 20px; padding-block: 24px 40px; display: grid; gap: 20px; }
+header { display: grid; gap: 4px; }
+.eyebrow { font-family: var(--f-mono); font-size: 12px; letter-spacing: .08em; text-transform: uppercase; color: var(--accent); }
+h1 { font-family: var(--f-display); font-weight: 800; font-size: clamp(26px, 3.4vw, 38px); line-height: 1.1; margin: 0; text-wrap: balance; }
+.more { font-size: 14px; color: var(--accent); justify-self: start; }
+
+.mapcard { background: var(--panel); border: 1px solid var(--rule); border-radius: 6px; padding: 12px; display: grid; gap: 10px; }
+.mapscroll { overflow-x: auto; }
+svg.map { display: block; width: 100%; min-width: 760px; height: auto; }
+.ocean { fill: var(--ocean); stroke: var(--coast); stroke-width: .12; }
+.land { fill: var(--land); stroke: var(--coast); stroke-width: .12; }
+.grid path { fill: none; stroke: var(--coast); stroke-width: .08; stroke-dasharray: .6 .6; opacity: .6; }
+.grid text { fill: var(--muted); font-family: var(--f-mono); font-size: 1.7px; }
+.bx { stroke: var(--panel); stroke-width: .15; cursor: pointer; transition: opacity .15s; }
+.bx:hover { opacity: .8; }
+.bx:focus { outline: none; }
+.bx:focus-visible, .bx.sel { stroke: var(--sel); stroke-width: .55; }
+.bx.S.W { fill: var(--s-w); } .bx.S.E { fill: var(--s-e); }
+.bx.C.W { fill: var(--c-w); } .bx.C.E { fill: var(--c-e); }
+.bx.N.W { fill: var(--n-w); } .bx.N.E { fill: var(--n-e); }
+.lbl { font-family: var(--f-mono); font-size: 1.9px; font-weight: 500; fill: var(--ink); paint-order: stroke; stroke: var(--panel); stroke-width: .5; pointer-events: none; text-anchor: middle; dominant-baseline: middle; }
+.lbl.sel { font-size: 2.4px; }
+.legend { display: flex; flex-wrap: wrap; gap: 6px 18px; font-size: 13px; color: var(--muted); }
+.legend span { display: inline-flex; align-items: center; gap: 6px; }
+.sw { width: 22px; height: 12px; border-radius: 2px; display: inline-flex; overflow: hidden; }
+.sw i { flex: 1; }
+
+.index { display: grid; gap: 8px; }
+.row { display: grid; grid-template-columns: 120px 1fr; gap: 10px; align-items: center; }
+.row h2 { font-family: var(--f-display); font-size: 14px; font-weight: 700; margin: 0; }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.chip { font-family: var(--f-mono); font-size: 13px; padding: 4px 10px; border-radius: 4px; border: 1px solid var(--rule); background: var(--panel); color: var(--ink); cursor: pointer; }
+.chip:hover { border-color: var(--accent); }
+.chip:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.chip[aria-pressed="true"] { background: var(--ink); color: var(--panel); border-color: var(--ink); }
+
+.detail { display: grid; grid-template-columns: minmax(0, 330px) minmax(0, 1fr); gap: 20px; align-items: start; }
+.stats { background: var(--panel); border: 1px solid var(--rule); border-radius: 6px; padding: 18px; display: grid; gap: 16px; position: sticky; top: calc(env(safe-area-inset-top, 0px) + 12px); }
+.code { font-family: var(--f-mono); font-size: 13px; color: var(--accent); letter-spacing: .04em; }
+.stats h3 { font-family: var(--f-display); font-size: 22px; font-weight: 700; margin: 2px 0 0; line-height: 1.2; text-wrap: balance; }
+.where { color: var(--muted); font-size: 14px; }
+.kv { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.kv div { display: grid; gap: 2px; }
+.kv dt { font-size: 12px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); }
+.kv dd { margin: 0; font-family: var(--f-display); font-size: 22px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.kv dd small { font-family: var(--f-body); font-size: 13px; font-weight: 400; color: var(--muted); }
+.shares { display: grid; gap: 8px; }
+.shares h4 { margin: 0; font-size: 12px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); font-weight: 600; }
+.bar { display: grid; grid-template-columns: 74px 1fr; gap: 8px; align-items: center; font-size: 13px; }
+.track { display: flex; height: 16px; border-radius: 3px; overflow: hidden; background: var(--rule); }
+.track i { display: block; height: 100%; }
+.keys { display: grid; grid-template-columns: 1fr 1fr; gap: 4px 10px; font-size: 13px; }
+.keys span { display: flex; align-items: center; gap: 6px; }
+.keys b { width: 10px; height: 10px; border-radius: 2px; flex: none; }
+.figure { background: #ffffff; border: 1px solid var(--rule); border-radius: 6px; padding: 10px; display: grid; gap: 8px; min-width: 0; }
+.figure img { width: 100%; height: auto; display: block; }
+.figure a { font-size: 13px; color: #0f5e8c; justify-self: end; }
+.views { display: inline-flex; border: 1px solid var(--rule); border-radius: 6px; overflow: hidden; justify-self: start; }
+.views button { font: 600 13px var(--f-body); color: var(--muted); background: var(--panel); border: 0; padding: 6px 14px; cursor: pointer; }
+.views button + button { border-left: 1px solid var(--rule); }
+.views button[aria-pressed="true"] { background: var(--accent); color: var(--panel); }
+.views button:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+@media (max-width: 860px) {
+  .detail { grid-template-columns: 1fr; }
+  .stats { position: static; }
+  .row { grid-template-columns: 1fr; gap: 4px; }
+}
+@media (prefers-reduced-motion: reduce) { .bx { transition: none; } }
+</style>
+
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="eyebrow">MPI-ESM1.2-LR · 5 members · historical + SSP3-7.0 · JJA</div>
+    <h1>Blocking-driven heatwaves by region</h1>
+    <a class="more" href="details.html">Methods and definitions →</a>
+  </header>
+
+  <section class="mapcard" aria-label="Map of the 18 boxes">
+    <div class="mapscroll">
+      <svg class="map" viewBox="__VIEWBOX__" role="group" aria-label="Northern mid-to-high-latitude map, Robinson projection">
+        <path class="ocean" d="__OCEAN__"/>
+        <g class="grid" id="grid">__GRID__</g>
+        <path class="land" d="__LAND__"/>
+        <g id="boxes"></g>
+        <g id="labels"></g>
+      </svg>
+    </div>
+    <div class="legend">
+      <span><span class="sw"><i style="background:var(--s-w)"></i><i style="background:var(--s-e)"></i></span>Southern band</span>
+      <span><span class="sw"><i style="background:var(--c-w)"></i><i style="background:var(--c-e)"></i></span>Central band</span>
+      <span><span class="sw"><i style="background:var(--n-w)"></i><i style="background:var(--n-e)"></i></span>Northern band</span>
+      <span>Light = West, dark = East of the split</span>
+    </div>
+  </section>
+
+  <nav class="index" id="index" aria-label="Box index"></nav>
+
+  <section class="detail" aria-live="polite">
+    <aside class="stats" id="stats"></aside>
+    <figure class="figure" style="margin:0">
+      <div class="views" role="group" aria-label="Figure">
+        <button type="button" data-view="hw" aria-pressed="true">Heatwaves</button>
+        <button type="button" data-view="lwa" aria-pressed="false">LWA distribution</button>
+      </div>
+      <img id="fig" alt="">
+      <a id="figlink" href="#" target="_blank" rel="noopener">Open full-size figure</a>
+    </figure>
+  </section>
+
+</div>
+
+<script>
+const DATA = __DATA__;
+const NS = "http://www.w3.org/2000/svg";
+const gB = document.getElementById("boxes"), gL = document.getElementById("labels"), gG = document.getElementById("grid");
+
+const els = {};
+DATA.forEach(d => {
+  const p = document.createElementNS(NS, "path");
+  p.setAttribute("d", d.path);
+  p.setAttribute("class", `bx ${d.band} ${d.side}`);
+  p.setAttribute("tabindex", "0");
+  p.setAttribute("role", "button");
+  p.setAttribute("aria-label", `${d.code}: ${d.label}, ${d.where}`);
+  const tt = document.createElementNS(NS, "title"); tt.textContent = `${d.code} · ${d.label} · ${d.n} heatwaves`;
+  p.appendChild(tt);
+  p.addEventListener("click", () => select(d.code));
+  p.addEventListener("keydown", e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); select(d.code); } });
+  gB.appendChild(p);
+  const t = document.createElementNS(NS, "text");
+  t.setAttribute("x", d.lx); t.setAttribute("y", d.ly); t.setAttribute("class", "lbl"); t.textContent = d.code;
+  gL.appendChild(t);
+  els[d.code] = { p, t };
+});
+
+const idx = document.getElementById("index");
+["North America", "Europe", "Asia"].forEach(cont => {
+  const row = document.createElement("div"); row.className = "row";
+  row.innerHTML = `<h2>${cont}</h2><div class="chips"></div>`;
+  DATA.filter(d => d.continent === cont).forEach(d => {
+    const b = document.createElement("button");
+    b.className = "chip"; b.id = "chip-" + d.code; b.textContent = d.code; b.title = `${d.label}, ${d.where}`;
+    b.setAttribute("aria-pressed", "false");
+    b.addEventListener("click", () => select(d.code));
+    row.querySelector(".chips").appendChild(b);
+    els[d.code].chip = b;
+  });
+  idx.appendChild(row);
+});
+
+const REG = [["Energy-limited", "var(--el)"], ["Transitional", "var(--tr)"], ["Moisture-limited", "var(--ml)"], ["Atm-to-sfc heating", "var(--ah)"]];
+function shareBar(vals) {
+  return `<div class="track">${vals.map((v, i) => v > 0 ? `<i style="width:${v}%;background:${REG[i][1]}" title="${REG[i][0]}"></i>` : "").join("")}</div>`;
+}
+const fmt = n => n.toLocaleString("en-US");
+
+function select(code) {
+  const d = DATA.find(x => x.code === code); if (!d) return;
+  Object.entries(els).forEach(([c, e]) => {
+    const on = c === code;
+    e.p.classList.toggle("sel", on); e.t.classList.toggle("sel", on);
+    e.chip.setAttribute("aria-pressed", on ? "true" : "false");
+    if (on) { gB.appendChild(e.p); }
+  });
+  document.getElementById("stats").innerHTML = `
+    <div><div class="code">${d.code}</div><h3>${d.label}</h3><div class="where">${d.where}</div></div>
+    <dl class="kv" style="margin:0">
+      <div><dt>Heatwaves</dt><dd>${fmt(d.n)}</dd></div>
+      <div><dt>Heatwave days</dt><dd>${fmt(d.days)}</dd></div>
+      <div><dt>Days / decade, hist.</dt><dd>${fmt(d.dpd_hist)} <small>5 members</small></dd></div>
+      <div><dt>Days / decade, SSP3-7.0</dt><dd>${fmt(d.dpd_ssp)} <small>5 members</small></dd></div>
+    </dl>
+    <div class="shares">
+      <h4>Heatwave days by regime</h4>
+      <div class="bar"><span>Historical</span>${shareBar(d.hist)}</div>
+      <div class="bar"><span>SSP3-7.0</span>${shareBar(d.ssp)}</div>
+      <div class="keys">${REG.map(r => `<span><b style="background:${r[1]}"></b>${r[0]}</span>`).join("")}</div>
+    </div>`;
+  current = code;
+  const img = document.getElementById("fig");
+  const src = view === "lwa" ? `figs/${code}_lwa_pdf.png` : `figs/${code}.png`;
+  img.src = src;
+  img.alt = view === "lwa"
+    ? `Probability density of daily JJA local wave activity (5–10 km) at grid points in ${code}, ${d.label}`
+    : `Heatwave days per decade, regime fractions, heatwave surface temperature and local wave activity for ${code}, ${d.label}`;
+  document.getElementById("figlink").href = src;
+  try { history.replaceState(null, "", "#" + code + (view === "lwa" ? ":lwa" : "")); } catch (e) {}
+}
+
+let current = "EU-WS", view = "hw";
+const vbtns = document.querySelectorAll(".views button");
+function setView(v) {
+  view = v;
+  vbtns.forEach(b => b.setAttribute("aria-pressed", b.dataset.view === v ? "true" : "false"));
+  select(current);
+}
+vbtns.forEach(b => b.addEventListener("click", () => setView(b.dataset.view)));
+const [start, sv] = (location.hash || "").slice(1).split(":");
+view = sv === "lwa" ? "lwa" : "hw";
+vbtns.forEach(b => b.setAttribute("aria-pressed", b.dataset.view === view ? "true" : "false"));
+select(DATA.some(d => d.code === start) ? start : "EU-WS");
+</script>
+</body>
+</html>
